@@ -1252,3 +1252,59 @@ def delete_award(request, id):
         a = get_object_or_404(Award, id=id)
         a.delete()
         return JsonResponse({"message": "Award deleted"})
+
+from django.shortcuts import render
+from rest_framework.decorators import api_view, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.response import Response
+from .models import Employee, Attendance
+from django.utils import timezone
+from datetime import datetime
+import face_recognition
+import os
+
+# Attendance HTML page
+def attendance_page(request):
+    return render(request, 'attendance.html')
+
+
+# Attendance API view
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def mark_attendance_view(request):
+    uploaded_image = request.FILES.get('image')
+    if not uploaded_image:
+        return Response({"status": "fail", "message": "No image uploaded."}, status=400)
+    
+    # Load uploaded image
+    uploaded_img = face_recognition.load_image_file(uploaded_image)
+    uploaded_encoding = face_recognition.face_encodings(uploaded_img)
+    
+    if not uploaded_encoding:
+        return Response({"status": "fail", "message": "No face detected in uploaded image."}, status=400)
+    
+    uploaded_encoding = uploaded_encoding[0]
+
+    employees = Employee.objects.all()
+    for emp in employees:
+        if emp.profile_picture and os.path.isfile(emp.profile_picture.path):
+            emp_img = face_recognition.load_image_file(emp.profile_picture.path)
+            emp_encoding = face_recognition.face_encodings(emp_img)
+            
+            if emp_encoding and face_recognition.compare_faces([emp_encoding[0]], uploaded_encoding, tolerance=0.5)[0]:
+                user = emp.email
+                today = timezone.localdate()
+                attendance, created = Attendance.objects.get_or_create(email=user, date=today)
+                
+                if not attendance.check_in:
+                    attendance.check_in = datetime.now().time()
+                    attendance.save()
+                    return Response({"status": "success", "message": f"Check-in marked for {emp.fullname}"})
+                elif not attendance.check_out:
+                    attendance.check_out = datetime.now().time()
+                    attendance.save()
+                    return Response({"status": "success", "message": f"Check-out marked for {emp.fullname}"})
+                else:
+                    return Response({"status": "info", "message": f"Attendance already marked for {emp.fullname}"})
+
+    return Response({"status": "fail", "message": "No matching employee found."}, status=404)

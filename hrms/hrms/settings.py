@@ -94,7 +94,7 @@ MIDDLEWARE = [
 #     "http://127.0.0.1:3000",
 #     "http://localhost:8080",
 # ]
-CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_ALL_ORIGINS = True  
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -226,7 +226,8 @@ DEBUG = True
 # SUPABASE_URL = os.getenv('SUPABASE_URL')
 # SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 
+# settings.py
 import os
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

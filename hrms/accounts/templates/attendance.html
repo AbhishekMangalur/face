@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Face Recognition Attendance</title>
+    <style>
+        #canvas {
+            display: none;
+            border: 4px solid green;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Face Recognition Attendance</h1>
+
+    <!-- Camera Preview -->
+    <video id="video" width="400" height="300" autoplay></video>
+    <canvas id="canvas" width="400" height="300"></canvas>
+
+    <!-- Upload Option -->
+    <div style="margin-top: 10px;">
+        <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <!-- Buttons -->
+    <div style="margin-top: 10px;">
+        <button id="startBtn">Start Camera</button>
+        <button id="captureBtn">Mark Attendance (Camera)</button>
+        <button id="uploadBtn">Mark Attendance (Upload)</button>
+    </div>
+
+    <p id="message" style="font-weight: bold; margin-top: 10px;"></p>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const message = document.getElementById('message');
+        const fileInput = document.getElementById('fileInput');
+        let stream = null;
+
+        // Start camera
+        document.getElementById('startBtn').addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.style.display = "block";
+                canvas.style.display = "none";
+                video.play();
+            } catch (err) {
+                alert("Cannot access camera");
+                console.error(err);
+            }
+        });
+
+        // Capture from camera
+        document.getElementById('captureBtn').addEventListener('click', () => {
+            if (!stream) {
+                alert("Start camera first!");
+                return;
+            }
+
+            // Draw current frame to canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Show captured image with green border
+            canvas.style.display = "block";
+            video.style.display = "none";
+
+            // Stop the camera stream so the frame is frozen
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+
+            // Convert to blob and send to backend
+            canvas.toBlob((blob) => {
+                uploadImage(blob, "attendance.jpg");
+            }, 'image/jpeg');
+        });
+
+        // Upload from file
+        document.getElementById('uploadBtn').addEventListener('click', () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Please select an image file first.");
+                return;
+            }
+            uploadImage(file, file.name);
+        });
+
+        // Function to send image to backend
+        async function uploadImage(file, filename) {
+            const formData = new FormData();
+            formData.append('image', file, filename);
+
+            try {
+                const response = await fetch("{% url 'mark_attendance' %}", {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                message.textContent = data.message;
+                message.style.color = data.status === "success" ? "green" : "red";
+            } catch (err) {
+                console.error(err);
+                message.textContent = "Failed to mark attendance.";
+                message.style.color = "red";
+            }
+        }
+    </script>
+</body>
+</html>
